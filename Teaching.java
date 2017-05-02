@@ -1,0 +1,445 @@
+package com.android.progBar;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.res.AssetManager;
+import android.database.Cursor;
+import android.database.SQLException;
+import android.database.sqlite.SQLiteDatabase;
+import android.os.Bundle;
+import android.os.CountDownTimer;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+public class Teaching extends Activity {
+    /** Called when the activity is first created. */    		
+	
+	DBManager dManager;
+	DBManager2 dManager2;
+	SQLiteDatabase db, db2;
+	private static final String DATABASE_NAME = "character.db";
+	private static final String DATABASE_NAME2 = "calendar.db";
+	int d_day = 1;
+	String d_strength, d_money;
+	int s_v, m_v, g_v;
+	String d_stage;
+	
+	SQLiteDatabase mDatabase;
+	String str1;
+	Boolean bo1;
+	int in1, in2;
+	String quest[] = new String[50];
+	boolean answer[] = new boolean[50];
+	int numb[] = new int[50];
+	int grad[] = new int[50];	
+	TextView tv, text;
+	Button trueB, falseB;
+	boolean check;
+	int rand;
+	int count = 0;
+	int correct = 0;
+	ImageView iv_time;	
+	Animation an;
+	CountDownTimer timer;
+	int timer_value = 0;
+	int timer_total = 12;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);                
+        setContentView(R.layout.teaching);        
+        
+        if (db == null) { 
+        	db = openOrCreateDatabase(DATABASE_NAME, Context.MODE_PRIVATE, null);
+		}
+        if (db2 == null) { 
+        	db2 = openOrCreateDatabase(DATABASE_NAME2, Context.MODE_PRIVATE, null);
+		}
+        
+        dManager = new DBManager(this, "character.db", null, 1);
+        db = dManager.getWritableDatabase();
+        db.close();
+        
+        dManager2 = new DBManager2(this, "calendar.db", null, 1);
+        db2 = dManager2.getWritableDatabase();
+        db2.close(); 
+        
+        getDay();
+        getValue();
+        
+        tv = (TextView) findViewById(R.id.quest);
+		trueB = (Button) findViewById(R.id.trueB);
+		falseB = (Button) findViewById(R.id.falseB);
+		iv_time = (ImageView)findViewById(R.id.time);	
+		text = (TextView)findViewById(R.id.result);
+		
+		initialize(this);
+		setAdaptor();
+		show();
+		
+		 iv_time.setVisibility(View.VISIBLE);
+	     an = AnimationUtils.loadAnimation(this, R.anim.spinteaching);	     
+	     
+	     iv_time.startAnimation(an);
+	     timer = new CountDownTimer(timer_total * 1000, 1000) {
+	        	@Override
+				public void onTick(long millisUntilFinished) {				       	   	
+	        		timer_value++;         		
+				}
+				@Override
+				public void onFinish(){
+					int m = 0;
+					if(correct == 5){
+						m = 20;
+						m_v = m_v + 20;				
+					}
+					else if(correct == 4){
+						m = 17;
+						m_v = m_v + 17;
+					}
+					else if(correct == 3){
+						m = 14;
+						m_v = m_v + 14;
+					}
+					else if(correct == 2){
+						m = 11;
+						m_v = m_v + 11;
+					}
+					else if(correct == 1){
+						m = 8;
+						m_v = m_v + 8;
+					}
+					else if(correct == 0){
+						m = 5;
+						m_v = m_v + 5;
+					}
+					s_v = s_v - 20;
+					
+					
+					 AlertDialog.Builder alertDlg = new AlertDialog.Builder(Teaching.this);   
+				      alertDlg.setTitle("결과");
+				      alertDlg.setMessage(
+								"\n" + "정답 수 : " + correct + "개" + "\n" + 
+										"돈 " + m +"만원을 받았습니다." + "\n" + 
+					  					"체력은 20 감소합니다." + "\n");   
+				      alertDlg.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+				       public void onClick(DialogInterface dialog, int whichButton) {
+				    	   
+				    	    setValue(s_v, m_v);
+							d_day = d_day + 3;
+							setDay(d_day);
+							startActivity(new Intent(Teaching.this, Main.class));
+												
+				       }    
+				      });
+				      alertDlg.show();
+				}			
+	        };
+	        
+	        timer.start();
+		}
+
+	public static final String ROOT_DIR = "/data/data/com.android.progBar/";
+	private static final String DATABASE_NAME3 = "teaching.sqlite";
+	public static final String TABLE_NAME = "teaching";
+	private static final String COLUMN_NUMBER = "num";
+	private static final String COLUMN_Q = "que";
+	private static final String COLUMN_A = "ans";
+	private static final String COLUMN_G = "grade";
+
+	public static void initialize(Context ctx) {
+		// check
+		File folder = new File(ROOT_DIR + "databases");
+		folder.mkdirs();
+		File outfile = new File(ROOT_DIR + "databases/" + DATABASE_NAME3);
+		if (outfile.length() <= 0) {
+			AssetManager assetManager = ctx.getResources().getAssets(); // 파일읽어오기
+			try {
+				InputStream is = assetManager.open(DATABASE_NAME3, AssetManager.ACCESS_BUFFER);
+				// 파일열어서 is에 저장하기
+				long filesize = is.available();
+				byte[] tempdata = new byte[(int) filesize];
+				is.read(tempdata);
+				is.close();
+
+				outfile.createNewFile(); // 새파일생성
+				FileOutputStream fo = new FileOutputStream(outfile); // 생성한파일
+																		// 아웃풋스트림
+				fo.write(tempdata); // 파일에다가 디비파일넣기
+				fo.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private void setAdaptor() {
+
+		if (mDatabase == null) {
+			mDatabase = openOrCreateDatabase(DATABASE_NAME3,
+					Context.MODE_PRIVATE, null);
+			// 데이터베이스열기
+		}
+
+		Cursor cursor = null;
+		//final CursorAdapter adaptor;
+		String[] columns = new String[] { COLUMN_NUMBER, COLUMN_Q, COLUMN_A, COLUMN_G };
+		cursor = mDatabase.query(TABLE_NAME, columns, COLUMN_G + "=" + g_v, null, null, null, null); // ti2에 pres값이 저장되어있음
+		int i = 0;
+
+		while (cursor.moveToNext()) {
+			
+			int number = cursor.getInt(cursor.getColumnIndex("num"));
+			String que = cursor.getString(cursor.getColumnIndex("que"));
+			String ans = cursor.getString(cursor.getColumnIndex("ans"));
+			int gra = cursor.getInt(cursor.getColumnIndex("grade"));
+
+			str1 = que;
+			bo1 = Boolean.valueOf(ans);
+			in1 = number;
+			in2 = gra;
+
+			quest[i] = str1;
+			answer[i] = bo1;
+			numb[i] = in1;
+			grad[i] = in2;
+			i++;
+
+		}
+
+	}
+	
+	public void show() //문제보여주기
+	{
+		rand = 1 + (int)((Math.random() * 50));
+		tv.setText(quest[rand]);
+		count++;
+	}
+	
+	public void onTrue(View v) 
+	{	
+		check = true;
+		comp();
+	}
+	
+	public void onFalse(View v)
+	{
+		check = false;
+		comp();
+	}
+	
+	public void comp(){ //정답비교
+		if(check == answer[rand]){	//db에 들어있는 true false 가 answer에 들어가 있음, 그거랑 비교 	//check가 사용자가선택한거	
+			correct++;	
+			text.setText("정답입니다");
+			if(count==5){
+				iv_time.clearAnimation();
+				
+				int m = 0;
+				if(correct == 5){
+					m = 20;
+					m_v = m_v + 20;				
+				}
+				else if(correct == 4){
+					m = 17;
+					m_v = m_v + 17;
+				}
+				else if(correct == 3){
+					m = 14;
+					m_v = m_v + 14;
+				}
+				else if(correct == 2){
+					m = 11;
+					m_v = m_v + 11;
+				}
+				else if(correct == 1){
+					m = 8;
+					m_v = m_v + 8;
+				}
+				else if(correct == 0){
+					m = 5;
+					m_v = m_v + 5;
+				}
+				s_v = s_v - 20;
+				
+				
+				 AlertDialog.Builder alertDlg = new AlertDialog.Builder(Teaching.this);   
+			      alertDlg.setTitle("결과");
+			      alertDlg.setMessage(
+							"\n" + "정답 수 : " + correct + "개" + "\n" + 
+									"돈 " + m +"만원을 받았습니다." + "\n" + 
+				  					"체력은 20 감소합니다." + "\n");   
+			      alertDlg.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+			       public void onClick(DialogInterface dialog, int whichButton) {
+			    	   
+			    	    setValue(s_v, m_v);
+						d_day = d_day + 3;
+						setDay(d_day);
+						startActivity(new Intent(Teaching.this, Main.class));
+											
+			       }    
+			      });
+			      alertDlg.show();
+			}
+			else show();					
+		}			
+		else{
+			text.setText("오답입니다");
+			if(count==5){
+				iv_time.clearAnimation();
+				int m = 0;
+				if(correct == 5){
+					m = 20;
+					m_v = m_v + 20;				
+				}
+				else if(correct == 4){
+					m = 17;
+					m_v = m_v + 17;
+				}
+				else if(correct == 3){
+					m = 14;
+					m_v = m_v + 14;
+				}
+				else if(correct == 2){
+					m = 11;
+					m_v = m_v + 11;
+				}
+				else if(correct == 1){
+					m = 8;
+					m_v = m_v + 8;
+				}
+				else if(correct == 0){
+					m = 5;
+					m_v = m_v + 5;
+				}
+				s_v = s_v - 20;
+				
+				
+				 AlertDialog.Builder alertDlg = new AlertDialog.Builder(Teaching.this);   
+			      alertDlg.setTitle("결과");
+			      alertDlg.setMessage(
+							"\n" + "정답 수 : " + correct + "개" + "\n" + 
+									"돈 " + m +"만원을 받았습니다." + "\n" + 
+				  					"체력은 20 감소합니다." + "\n");   
+			      alertDlg.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+			       public void onClick(DialogInterface dialog, int whichButton) {
+			    	   
+			    	    setValue(s_v, m_v);
+						d_day = d_day + 3;
+						setDay(d_day);
+						startActivity(new Intent(Teaching.this, Main.class));
+											
+			       }    
+			      });
+			      alertDlg.show();
+			}
+			else show();
+		}		
+	}
+		
+	public void getValue(){
+    	
+	  	  db = dManager.getWritableDatabase();   
+	  	  String sql = "SELECT distinct strength, money, stage FROM character;";
+
+	    	  try{   
+	    		  
+	    	   Cursor cur = db.rawQuery(sql, null);
+	    	   
+	    	   while(cur.moveToNext()){
+	    	       		   
+	    		   d_strength = cur.getString(cur.getColumnIndex("strength"));
+	    		   d_money = cur.getString(cur.getColumnIndex("money"));
+	    		   d_stage = cur.getString(cur.getColumnIndex("stage"));
+	    		     		  
+	    	   }    	   
+	    	   
+	    	 }catch (SQLException se) {
+	    	   // TODO: handle exception    	  
+	    	 }   
+	          db.close();
+	          
+	      s_v = Integer.parseInt(d_strength);
+	      m_v = Integer.parseInt(d_money);
+	      g_v = Integer.parseInt(d_stage);
+	  }
+	
+	public void setValue(int s, int m){
+		
+		if(s < 0){ s = 0; }  
+		
+		String str_s = String.valueOf(s);
+		String str_m = String.valueOf(m);
+	
+    	String sql = "", sql2 = "";
+		db = dManager.getWritableDatabase();    	
+   		
+		sql = "update character set strength = '" + str_s + "';";
+		sql2 = "update character set money = '" + str_m + "';";
+		 
+		db.execSQL(sql);
+		db.execSQL(sql2);
+		
+		db.close();  
+		
+	}
+
+   public void getDay(){
+	   
+	   db2 = dManager2.getWritableDatabase();   
+ 	   String sql = "SELECT day FROM calendar;";
+
+   	  try{   
+   		  
+   	   Cursor cur = db2.rawQuery(sql, null);
+   	   
+   	   while(cur.moveToNext()){
+   		   
+   		   d_day = cur.getInt(cur.getColumnIndex("day"));     		   
+   		  
+   	   }    	   
+   	   
+   	 }catch (SQLException se) {
+   	   // TODO: handle exception    	  
+   	 }   
+         db2.close();          
+	     
+   }  
+   
+   public void setDay(int d){
+ 	   
+	    String sql = "";	    
+	    db2 = dManager2.getWritableDatabase(); 
+	    
+	    if(d > 30){
+	    	d = 1;
+	    	sql = "update calendar set day = '" + d + "';";	
+	    }   
+	    else sql = "update calendar set day = '" + d + "';";		
+			 
+		db2.execSQL(sql);
+		db2.close();
+	   
+  }
+   
+   public boolean onKeyDown(int keyCode, KeyEvent event) {
+	      
+       return true;
+      
+   }
+}
+
+
